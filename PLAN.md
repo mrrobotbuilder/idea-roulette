@@ -59,4 +59,6 @@ Needs the owner's prep (see HOW-TO-RUN, Stage 3).
 3. Builder page `#builder-<nick>`: their builds, streak, total.
 4. Launch check: `get_project` ssoProtection is `preview`, envs present in Production, fetch the alias logged-out from a sandbox on someone else's network, full flow on the live site at 390 and 1280, update README + FEATURES.md (move shipped items).
 
+**As built (2026-09-26):** leaderboard members are lower-case nicks (display case comes from `nick:<lower>`). `weeks:<nick>` is a HASH of ISO week -> visible build count, not a set, so a build hidden by reports takes its week back (a week counts while its count is > 0). Longest streak is derived from that hash on read, not stored separately, so it can never disagree with it. Extra key: `builds:nick:<lower>` list for the builder page. All writes live in the same Lua scripts as before (post, hide, unhide), so counts move atomically with the build. Streak math is `src/streak.ts` (UTC ISO weeks). `GET /api/builder?nick=` backs `#builder-<nick>`; a post answers with the current `streak`. `scripts/verify-builds.ts` covers the leaderboard, builder page and week counts through post, hide, unhide and nick hide.
+
 **Verify:** streak math is a pure function with a check (weeks spanning a year boundary, week 53, gap of one week breaks it, current week not yet built keeps it). Live flow end to end.

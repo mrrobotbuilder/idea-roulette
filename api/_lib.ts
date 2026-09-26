@@ -94,3 +94,41 @@ export const checkTitle = (v: unknown): string => {
   if (n < 3 || n > 80) return "The title must be 3 to 80 characters.";
   return "";
 };
+
+// ---------- reading builds and builders ----------
+export type Build = { id: string; ideaId: string; twist: number | null; url: string; title: string; nick: string; createdAt: number };
+
+// Loads builds by id, dropping hidden builds and builds whose nickname is hidden.
+export const readBuilds = async (ids: string[]): Promise<Build[]> => {
+  const valid = ids.filter((id) => BUILD_ID.test(id));
+  if (valid.length === 0) return [];
+  const p = redis.pipeline();
+  for (const id of valid) p.hgetall(`build:${id}`);
+  const rows = ((await p.exec()) as unknown[]).map(toHash);
+  const live = rows.filter((b): b is Record<string, string> => !!b && typeof b.nick === "string" && b.hidden !== "1");
+  const nicks = [...new Set(live.map((b) => b.nick.toLowerCase()))];
+  const hiddenNicks = new Set<string>();
+  if (nicks.length) {
+    const q = redis.pipeline();
+    for (const n of nicks) q.hget(`nick:${n}`, "hidden");
+    ((await q.exec()) as (string | null)[]).forEach((h, i) => h === "1" && hiddenNicks.add(nicks[i]));
+  }
+  return live
+    .filter((b) => !hiddenNicks.has(b.nick.toLowerCase()))
+    .map((b) => ({
+      id: b.id,
+      ideaId: b.ideaId,
+      twist: b.twist === "" ? null : Number(b.twist),
+      url: b.url,
+      title: b.title,
+      nick: b.nick,
+      createdAt: Number(b.createdAt),
+    }));
+};
+
+// The ISO weeks a nickname has at least one visible build in. `weeks:<nick>` is a hash of
+// week -> build count, so a build hidden by reports takes its week back with it.
+export const weeksOf = async (lower: string) => {
+  const h = toHash(await redis.hgetall(`weeks:${lower}`)) ?? {};
+  return Object.keys(h).filter((w) => Number(h[w]) > 0);
+};

@@ -1,10 +1,11 @@
-// Stage 4 check against a running server. It writes to the ONE shared Redis store (vercel dev
+// Stage 4 + 5 check against a running server (builds, nicknames, reports, leaderboard, streaks). It writes to the ONE shared Redis store (vercel dev
 // uses the live database), so everything it creates is removed at the end and the totals are
 // compared with what they were before.
 //   node --env-file=.env.local --env-file=.env --use-system-ca scripts/verify-builds.ts http://localhost:5207 --local
 // --local also runs the report/hide/unhide checks. They need 3 different client IPs, which only
 // vercel dev lets a script fake with x-forwarded-for, and the ADMIN_TOKEN from .env.
 import { Redis } from "@upstash/redis";
+import { isoWeek, monthOf } from "../src/streak.ts";
 
 const BASE = process.argv[2];
 const LOCAL = process.argv.includes("--local");
@@ -42,7 +43,20 @@ const rejects = async (name: string, b: Record<string, unknown> | string, status
   ok(r.status === status && typeof r.body?.error === "string" && r.body.error.includes(words), `rejects ${name}: "${r.body?.error}"`, r);
 };
 
-const before = { recent: await redis.llen("builds:recent"), idea: await redis.llen(`builds:idea:${IDEA}`) };
+const MONTH = `lb:${monthOf(Date.now())}`;
+const before = {
+  recent: await redis.llen("builds:recent"),
+  idea: await redis.llen(`builds:idea:${IDEA}`),
+  lbAll: await redis.zcard("lb:all"),
+  lbMonth: await redis.zcard(MONTH),
+};
+// What the leaderboard, the builder page and the week counter say about the test nick.
+const standing = async () => {
+  const [all, month, page] = await Promise.all([call("/api/leaderboard?period=all"), call("/api/leaderboard?period=month"), call(`/api/builder?nick=${NICK.toUpperCase()}`)]);
+  const row = (r: Res) => (r.body?.leaders ?? []).find((l: any) => l.nick === NICK) ?? null;
+  const week = Number((await redis.hget(`weeks:${NICK.toLowerCase()}`, isoWeek(Date.now()))) ?? 0);
+  return { all: row(all), month: row(month), page, week };
+};
 try {
   // ---------- every validation rule, each with a clear message ----------
   await rejects("non-JSON body", "not json", 400, "JSON");
@@ -112,6 +126,18 @@ try {
   const sixth = await post({ secret });
   ok(fifth.status === 201 && sixth.status === 429 && sixth.body.error.includes("5 builds"), "6th build of the day for one nick gets 429", sixth);
 
+  // ---------- leaderboard, builder page, streak ----------
+  ok(first.body?.streak === 1 && fifth.body?.streak === 1, "a post answers with the current streak (1 week)", [first.body?.streak, fifth.body?.streak]);
+  let st = await standing();
+  ok(st.all?.builds === 5 && st.all?.streak === 1 && st.all?.longest === 1, "all-time leaderboard: 5 builds, 🔥 1 week", st.all);
+  ok(st.month?.builds === 5, "monthly leaderboard: 5 builds", st.month);
+  ok(st.week === 5, "this week holds 5 builds", st.week);
+  ok(st.page.status === 200 && st.page.body.nick === NICK && st.page.body.total === 5 && st.page.body.month === 5 && st.page.body.streak === 1, "builder page (any letter case): display nick, 5 builds, streak 1", st.page.body);
+  ok(st.page.body?.builds?.length === 5 && st.page.body.builds.every((b: any) => b.nick === NICK && !("hidden" in b)), "builder page lists its 5 builds and no flags", st.page.body?.builds);
+  ok((await call("/api/leaderboard?period=year")).status === 400, "leaderboard rejects an unknown period");
+  ok((await call("/api/builder?nick=%3Cscript%3E")).status === 400, "builder page rejects a malformed nick");
+  ok((await call(`/api/builder?nick=zzt${tag}nobody`)).status === 404, "builder page 404s an unclaimed nick");
+
   // ---------- reports, hide, admin unhide ----------
   if (LOCAL) {
     const ip = (n: number) => ({ "x-forwarded-for": `203.0.113.${n}` });
@@ -129,6 +155,10 @@ try {
     ok(r.body.hidden === false, "2 IPs do not hide it");
     r = await report(target, "reporter-eeee", 3);
     ok(r.body.hidden === true && !(await listed(target)), "3 reporters from 3 IPs hide it", r);
+    st = await standing();
+    ok(st.all?.builds === 4 && st.month?.builds === 4 && st.page.body.total === 4 && st.week === 4 && st.page.body.builds.length === 4, "a hidden build leaves the leaderboards, the week and the builder page", st);
+    await report(target, "reporter-ffff", 4);
+    ok((await standing()).all?.builds === 4, "more reports on a hidden build do not take a second point");
     ok((await report("0".repeat(12), "reporter-aaaa", 1)).status === 404, "report of an unknown build is 404");
     ok((await call("/api/report", { buildId: "<script>", reporterId: "reporter-aaaa" })).status === 400, "report with a bad id is 400");
 
@@ -138,6 +168,10 @@ try {
     const good = `Bearer ${process.env.ADMIN_TOKEN}`;
     r = await admin({ buildId: target }, good);
     ok(r.status === 200 && (await listed(target)), "admin unhide brings the build back", r);
+    st = await standing();
+    ok(st.all?.builds === 5 && st.week === 5 && st.page.body.total === 5, "unhide gives back the leaderboard point and the week", st);
+    r = await admin({ buildId: target }, good);
+    ok((await standing()).all?.builds === 5, "unhiding a visible build twice adds nothing");
     for (const n of [4, 5, 6]) r = await report(target, `reporter-z${n}zz`, n);
     ok(r.body.hidden === false && (await listed(target)), "a reviewed build cannot be hidden again by reports", r);
 
@@ -147,10 +181,14 @@ try {
     const nickHidden = await redis.hget<string>(`nick:${NICK.toLowerCase()}`, "hidden");
     ok(nickHidden === "1", "3 hidden builds hide the nickname", nickHidden);
     ok(!(await listed(target)), "a hidden nickname's builds leave the gallery");
+    st = await standing();
+    ok(st.all === null && st.month === null && st.page.status === 404, "a hidden nickname leaves the leaderboard and its page", st);
     const blocked = await post({ secret, ideaId: IDEA2, url: url("x") }, ip(20));
     ok(blocked.status === 403 && blocked.body.error.includes("review"), "a hidden nickname cannot post", blocked);
     r = await admin({ nick: NICK }, good);
     ok(r.status === 200 && (await listed(target)), "admin unhide of the nickname restores its builds", r);
+    st = await standing();
+    ok(st.all?.builds === 2 && st.page.body.total === 2 && st.week === 2, "back on the board with only its 2 unhidden builds", st);
   }
 } finally {
   // ---------- undo every write ----------
@@ -169,7 +207,11 @@ try {
     p.lrem("builds:recent", 0, c.id);
     p.srem(`urls:${c.ideaId}`, c.url);
   }
-  for (const n of nicks) p.del(`nick:${n}`);
+  for (const n of nicks) {
+    p.del(`nick:${n}`, `weeks:${n}`, `builds:nick:${n}`);
+    p.zrem("lb:all", n);
+    p.zrem(MONTH, n);
+  }
   if (created.length) await p.exec();
   // Rate-limit counters from this run (it is a fresh feature: nobody else's quota is in here yet).
   for (const pattern of ["rl:build:*", "rl:report:*"]) {
@@ -180,9 +222,14 @@ try {
       cursor = String(next);
     } while (cursor !== "0");
   }
-  const after = { recent: await redis.llen("builds:recent"), idea: await redis.llen(`builds:idea:${IDEA}`) };
+  const after = {
+    recent: await redis.llen("builds:recent"),
+    idea: await redis.llen(`builds:idea:${IDEA}`),
+    lbAll: await redis.zcard("lb:all"),
+    lbMonth: await redis.zcard(MONTH),
+  };
   const leftover = await Promise.all(created.map((c) => redis.exists(`build:${c.id}`)));
-  ok(after.recent === before.recent && after.idea === before.idea && leftover.every((x) => x === 0), `cleanup: ${created.length} test builds removed, list lengths back to ${JSON.stringify(before)}`, after);
+  ok(JSON.stringify(after) === JSON.stringify(before) && leftover.every((x) => x === 0), `cleanup: ${created.length} test builds removed, list lengths back to ${JSON.stringify(before)}`, after);
   console.log(failed ? `\n${failed} FAILED` : "\nALL PASSED");
   process.exitCode = failed ? 1 : 0;
 }

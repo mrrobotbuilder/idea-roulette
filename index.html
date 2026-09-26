@@ -57,6 +57,16 @@
       <ol id="top"></ol>
     </details>
 
+    <details class="history top" id="lbWrap">
+      <summary><h2>🏆 Top builders</h2></summary>
+      <div class="lb-tabs" role="group" aria-label="Leaderboard period">
+        <button id="lbMonth" aria-pressed="true">This month</button>
+        <button id="lbAll" aria-pressed="false">All time</button>
+      </div>
+      <p class="top-msg" id="lbMsg" aria-live="polite"></p>
+      <ol class="lb" id="lb"></ol>
+    </details>
+
     <details class="history top" id="recentWrap">
       <summary><h2>🚀 Recent builds</h2></summary>
       <p class="top-msg" id="recentMsg" aria-live="polite"></p>
@@ -146,6 +156,17 @@
           <p class="env-text">Bawk bawk. The challenge will wait for someone braver.</p>
           <div class="env-actions"><button id="envBack" class="primary">🎰 Spin my own</button></div>
         </div>
+      </div>
+    </div>
+
+    <div class="modal" id="builderModal" hidden>
+      <div class="modal-inner panel" role="dialog" aria-modal="true" aria-labelledby="bdNick">
+        <button class="close" id="bdClose" aria-label="Close">✕</button>
+        <h2 class="bd-nick" id="bdNick"></h2>
+        <p class="streak-badge" id="bdBadge" hidden></p>
+        <p class="bd-stats" id="bdStats"></p>
+        <p class="top-msg" id="bdMsg" aria-live="polite"></p>
+        <ul class="builds" id="bdList"></ul>
       </div>
     </div>
 

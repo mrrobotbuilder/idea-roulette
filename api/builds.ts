@@ -1,10 +1,10 @@
 import { randomBytes } from "node:crypto";
 import { TWISTS } from "../src/ideas.ts";
-import { BUILD_ID, NICK, SECRET, buildIpLimit, buildNickLimit, checkTitle, checkUrl, ipOf, json, readJson, redis, sha256, toHash, validId } from "./_lib.ts";
+import { isoWeek, monthOf, streaks } from "../src/streak.ts";
+import { NICK, SECRET, buildIpLimit, buildNickLimit, checkTitle, checkUrl, ipOf, json, readBuilds, readJson, redis, sha256, toHash, validId, weeksOf } from "./_lib.ts";
 
-export type Build = { id: string; ideaId: string; twist: number | null; url: string; title: string; nick: string; createdAt: number };
-
-// Claim-or-verify the nickname, refuse a duplicate link, and write the build, all in one step.
+// Claim-or-verify the nickname, refuse a duplicate link, write the build and count it on the
+// leaderboards (all time, this month) and in the nickname's weeks, all in one step.
 // Returns 1 if this call claimed the nickname, 0 if it already was ours, or a negative refusal.
 const postBuild = redis.createScript<number>(`
 local h = redis.call("HGET", KEYS[1], "secretHash")
@@ -22,6 +22,10 @@ redis.call("HSET", KEYS[3], "id", ARGV[5], "ideaId", ARGV[6], "twist", ARGV[7], 
 redis.call("LPUSH", KEYS[4], ARGV[5])
 redis.call("LPUSH", KEYS[5], ARGV[5])
 redis.call("LTRIM", KEYS[5], 0, 199)
+redis.call("ZINCRBY", KEYS[6], 1, ARGV[9])
+redis.call("ZINCRBY", KEYS[7], 1, ARGV[9])
+redis.call("HINCRBY", KEYS[8], ARGV[10], 1)
+redis.call("LPUSH", KEYS[9], ARGV[5])
 return created
 `);
 
@@ -63,15 +67,16 @@ export async function POST(req: Request) {
   const id = randomBytes(6).toString("hex");
   const now = Date.now();
   const r = await postBuild.exec(
-    [`nick:${lower}`, `urls:${ideaId}`, `build:${id}`, `builds:idea:${ideaId}`, "builds:recent"],
-    [hash, nick, String(now), href, id, ideaId as string, twist === null ? "" : String(twist), (title as string).trim()],
+    [`nick:${lower}`, `urls:${ideaId}`, `build:${id}`, `builds:idea:${ideaId}`, "builds:recent", "lb:all", `lb:${monthOf(now)}`, `weeks:${lower}`, `builds:nick:${lower}`],
+    [hash, nick, String(now), href, id, ideaId as string, twist === null ? "" : String(twist), (title as string).trim(), lower, isoWeek(now)],
   );
   if (r === -1) return json({ error: TAKEN }, 403);
   if (r === -2) return json({ error: REVIEW }, 403);
   if (r === -3) return json({ error: DUP }, 409);
   const [stored] = await readBuilds([id]);
+  const { current: streak } = streaks(await weeksOf(lower), now);
   // The secret goes back only when the server made it: it is shown once and never stored in the clear.
-  return json({ build: stored, secret: r === 1 && typeof secret !== "string" ? mine : undefined }, 201);
+  return json({ build: stored, streak, secret: r === 1 && typeof secret !== "string" ? mine : undefined }, 201);
 }
 
 // GET /api/builds?idea=<ideaId> -> this idea's builds; GET /api/builds -> the recent wall.
@@ -82,31 +87,3 @@ export async function GET(req: Request) {
   const builds = await readBuilds(ids);
   return json({ builds: builds.slice(0, idea ? 20 : 30) });
 }
-
-// Loads builds by id, dropping hidden builds and builds whose nickname is hidden.
-const readBuilds = async (ids: string[]): Promise<Build[]> => {
-  const valid = ids.filter((id) => BUILD_ID.test(id));
-  if (valid.length === 0) return [];
-  const p = redis.pipeline();
-  for (const id of valid) p.hgetall(`build:${id}`);
-  const rows = ((await p.exec()) as unknown[]).map(toHash);
-  const live = rows.filter((b): b is Record<string, string> => !!b && typeof b.nick === "string" && b.hidden !== "1");
-  const nicks = [...new Set(live.map((b) => b.nick.toLowerCase()))];
-  const hiddenNicks = new Set<string>();
-  if (nicks.length) {
-    const q = redis.pipeline();
-    for (const n of nicks) q.hget(`nick:${n}`, "hidden");
-    ((await q.exec()) as (string | null)[]).forEach((h, i) => h === "1" && hiddenNicks.add(nicks[i]));
-  }
-  return live
-    .filter((b) => !hiddenNicks.has(b.nick.toLowerCase()))
-    .map((b) => ({
-      id: b.id,
-      ideaId: b.ideaId,
-      twist: b.twist === "" ? null : Number(b.twist),
-      url: b.url,
-      title: b.title,
-      nick: b.nick,
-      createdAt: Number(b.createdAt),
-    }));
-};

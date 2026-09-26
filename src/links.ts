@@ -8,6 +8,7 @@ export const NAME_MAX = 24;
 export type Route =
   | { kind: "idea"; pick: Pick }
   | { kind: "daily" }
+  | { kind: "builder"; nick: string }
   | { kind: "challenge"; pick: Pick; hours: number; name: string };
 
 const b64url = (s: string) =>
@@ -32,7 +33,10 @@ const num = (s: string) => (/^(0|[1-9]\d{0,3})$/.test(s) ? Number(s) : NaN);
 
 export const parseHash = (hash: string): Route | null => {
   if (hash === "#daily") return { kind: "daily" };
-  let m = /^#([a-z]+)-(\d+)(?:-(\d+))?$/.exec(hash);
+  // Before the idea pattern, so a nickname made of digits is still a builder.
+  let m = /^#builder-([A-Za-z0-9_-]{3,20})$/.exec(hash);
+  if (m) return { kind: "builder", nick: m[1] };
+  m = /^#([a-z]+)-(\d+)(?:-(\d+))?$/.exec(hash);
   if (m) {
     const twist = m[3] === undefined ? null : num(m[3]);
     const pick = Number.isNaN(twist) ? null : pickFromId(m[1], num(m[2]), twist);

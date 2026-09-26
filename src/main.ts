@@ -205,6 +205,7 @@ const spin = () => {
   const normal = pickIdea();
   if (!normal) return toast(NOTHING); // never spin into nothing
   closeModal();
+  closeBuilder();
   // The wheel always lands on a live category; a jackpot swaps in a legendary idea on top.
   const jp = hitJackpot();
   const pick: Pick = jp ? { cat: JACKPOT, idx: rand(JACKPOTS.length), twist: null } : normal;
@@ -251,7 +252,7 @@ document.addEventListener("keydown", (e) => {
     e.preventDefault();
     spin();
   }
-  if (e.key === "Escape") closeModal();
+  if (e.key === "Escape") closeModal(), closeBuilder();
 });
 
 // ---------- fortune ----------
@@ -320,6 +321,7 @@ const modalInner = $("modalInner");
 const cookie = $("cookie");
 const chForm = $<HTMLFormElement>("chForm");
 const reveal = (p: Pick, ctxt: Context = {}) => {
+  closeBuilder();
   current = p;
   context = ctxt;
   const jp = p.cat === JACKPOT;
@@ -443,6 +445,7 @@ const openChallenge = (r: Extract<Route, { kind: "challenge" }>, hash: string) =
   const acceptedAt = challenges[hash];
   if (typeof acceptedAt === "number") return revealChallenge(r, hash, acceptedAt);
   closeModal();
+  closeBuilder();
   pending = { route: r, hash };
   $("envText").textContent = `${r.name || "A friend"} challenges you to build this within ${hoursLabel(r.hours)}. Accept?`;
   $("envAsk").hidden = false;
@@ -681,6 +684,11 @@ const el = <K extends keyof HTMLElementTagNameMap>(tag: K, cls: string, text = "
   n.textContent = text;
   return n;
 };
+const nickLink = (nick: string) => {
+  const b = el("button", "link nick-link", nick);
+  b.dataset.nick = nick;
+  return b;
+};
 const buildItem = (b: Build, withIdea: boolean) => {
   const href = safeHref(b.url);
   if (!href) return null;
@@ -689,7 +697,8 @@ const buildItem = (b: Build, withIdea: boolean) => {
   a.href = href;
   a.target = "_blank";
   a.rel = "noopener nofollow ugc";
-  const by = el("span", "build-by", `by ${b.nick}`);
+  const by = el("span", "build-by", "by ");
+  by.append(nickLink(b.nick));
   const pick = withIdea ? pickOfId(b.ideaId) : null;
   if (pick) {
     by.append(" · for ");
@@ -755,6 +764,8 @@ const onBuildClick = async (e: Event) => {
     if (p && !spinning && envelope.hidden) reveal(p);
     return;
   }
+  const nick = t.closest<HTMLButtonElement>(".nick-link")?.dataset.nick;
+  if (nick) return openBuilder(nick);
   const rep = t.closest<HTMLButtonElement>(".report");
   if (!rep || rep.disabled) return;
   rep.disabled = true;
@@ -775,6 +786,98 @@ const onBuildClick = async (e: Event) => {
 };
 galList.addEventListener("click", onBuildClick);
 $("recent").addEventListener("click", onBuildClick);
+
+// ---------- builders: leaderboard, streaks, builder pages ----------
+type Leader = { nick: string; builds: number; streak: number; longest: number };
+const weeksLabel = (n: number) => `🔥 ${n} week${n === 1 ? "" : "s"}`;
+const streakLabel = (n: number) => `🔥 ${n}-week streak`;
+const lbWrap = $<HTMLDetailsElement>("lbWrap");
+const lbMsg = $("lbMsg");
+const lbList = $("lb");
+let lbPeriod: "month" | "all" = "month";
+let lbAsked = 0; // like voteFor: only the newest request may draw
+const drawLb = async () => {
+  if (!lbWrap.open) return;
+  const ask = ++lbAsked;
+  $("lbMonth").setAttribute("aria-pressed", String(lbPeriod === "month"));
+  $("lbAll").setAttribute("aria-pressed", String(lbPeriod === "all"));
+  lbMsg.hidden = false;
+  lbMsg.textContent = "Tallying the builders…";
+  try {
+    const { leaders } = await api<{ leaders: Leader[] }>(`/api/leaderboard?period=${lbPeriod}`);
+    if (ask !== lbAsked) return;
+    lbList.replaceChildren(
+      ...leaders.map((l, i) => {
+        const li = el("li", "lb-row");
+        const who = nickLink(l.nick);
+        who.prepend(el("span", "lb-rank", `${i + 1}`));
+        const streak = el("span", "lb-streak", l.streak > 0 ? weeksLabel(l.streak) : "");
+        li.append(who, streak, el("b", "", `${l.builds} build${l.builds === 1 ? "" : "s"}`));
+        return li;
+      }),
+    );
+    lbMsg.textContent = leaders.length ? "" : lbPeriod === "month" ? "Nobody has shipped a build this month yet. Be the first." : "No builders yet. Spin, build it, then hit 🚀 I built it!";
+    lbMsg.hidden = leaders.length > 0;
+  } catch (e) {
+    console.error("leaderboard:", e);
+    if (ask !== lbAsked) return;
+    lbList.replaceChildren();
+    lbMsg.textContent = "The leaderboard is offline right now.";
+  }
+};
+lbWrap.addEventListener("toggle", drawLb);
+$("lbMonth").addEventListener("click", () => ((lbPeriod = "month"), drawLb()));
+$("lbAll").addEventListener("click", () => ((lbPeriod = "all"), drawLb()));
+lbList.addEventListener("click", (e) => {
+  const nick = (e.target as HTMLElement).closest<HTMLButtonElement>(".nick-link")?.dataset.nick;
+  if (nick) openBuilder(nick);
+});
+
+const builderModal = $("builderModal");
+const bdList = $("bdList");
+const bdMsg = $("bdMsg");
+let builderFor = "";
+const openBuilder = async (nick: string) => {
+  if (spinning || !envelope.hidden) return;
+  closeModal();
+  builderFor = nick.toLowerCase();
+  const asked = builderFor;
+  window.history.replaceState(null, "", `#builder-${nick}`);
+  $("bdNick").textContent = nick;
+  $("bdBadge").hidden = true;
+  $("bdStats").textContent = "";
+  bdList.replaceChildren();
+  bdMsg.hidden = false;
+  bdMsg.textContent = "Looking up this builder…";
+  builderModal.hidden = false;
+  $("bdClose").focus();
+  try {
+    const b = await api<{ nick: string; total: number; month: number; streak: number; longest: number; builds: Build[] }>(`/api/builder?nick=${nick}`);
+    if (builderFor !== asked) return;
+    $("bdNick").textContent = b.nick;
+    $("bdBadge").textContent = b.streak > 0 ? streakLabel(b.streak) : "No streak going. Ship one this week to start it.";
+    $("bdBadge").hidden = false;
+    $("bdStats").textContent = `${b.total} build${b.total === 1 ? "" : "s"} · ${b.month} this month · best streak ${b.longest} week${b.longest === 1 ? "" : "s"}`;
+    drawBuilds(bdList, b.builds, true);
+    bdMsg.textContent = b.builds.length ? "" : "No builds to show.";
+    bdMsg.hidden = b.builds.length > 0;
+  } catch (e) {
+    console.error("builder:", e);
+    if (builderFor === asked) bdMsg.textContent = errText(e);
+  }
+};
+const closeBuilder = () => {
+  if (builderModal.hidden) return;
+  builderModal.hidden = true;
+  builderFor = "";
+  // Only clear our own hash: a builder page closed by an idea link keeps that link's hash.
+  if (location.hash.startsWith("#builder-")) window.history.replaceState(null, "", location.pathname);
+};
+$("bdClose").addEventListener("click", closeBuilder);
+builderModal.addEventListener("click", (e) => {
+  if (e.target === builderModal) closeBuilder();
+});
+bdList.addEventListener("click", onBuildClick);
 
 const buildForm = $<HTMLFormElement>("buildForm");
 const bNick = $<HTMLInputElement>("bNick");
@@ -816,7 +919,7 @@ buildForm.addEventListener("submit", async (e) => {
   const submit = buildForm.querySelector<HTMLButtonElement>('button[type="submit"]')!;
   submit.disabled = true;
   try {
-    const r = await api<{ build: Build; secret?: string }>("/api/builds", {
+    const r = await api<{ build: Build; streak: number; secret?: string }>("/api/builds", {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
@@ -843,9 +946,10 @@ buildForm.addEventListener("submit", async (e) => {
       $<HTMLInputElement>("recCode").value = `${r.build.nick}.${r.secret}`;
       recovery.hidden = false;
       $("recCopy").focus();
-    } else toast("🚀 Posted! It is in the gallery.");
+    } else toast(`🚀 Posted! It is in the gallery. ${streakLabel(r.streak)}.`);
     if (ideaId(p) === galleryFor) loadGallery(galleryFor);
     drawRecent();
+    drawLb();
   } catch (e) {
     console.error("build:", e);
     formMsg(errText(e));
@@ -889,6 +993,7 @@ const route = () => {
   if (!r) return;
   if (r.kind === "daily") openDaily();
   else if (r.kind === "idea") reveal(r.pick);
+  else if (r.kind === "builder") openBuilder(r.nick);
   else openChallenge(r, location.hash);
 };
 window.addEventListener("hashchange", route);
