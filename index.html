@@ -4,9 +4,9 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Idea Roulette: spin for your next build</title>
-    <meta name="description" content="Out of ideas? Spin the wheel, crack the fortune cookie, and get your next app idea. 400 ideas, 40 twists, free forever. Built for vibe coders." />
+    <meta name="description" content="Out of ideas? Spin the wheel, crack the fortune cookie, and get your next app idea. 450+ ideas, 40 twists, a daily fortune and a 1 in 40 jackpot. Free forever. Built for vibe coders." />
     <meta property="og:title" content="Idea Roulette" />
-    <meta property="og:description" content="Spin the wheel, crack the cookie, build the idea. 400 ideas for vibe coders." />
+    <meta property="og:description" content="Spin the wheel, crack the cookie, build the idea. 450+ ideas for vibe coders." />
     <meta name="theme-color" content="#0b3d2e" />
     <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🥠</text></svg>" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -32,8 +32,11 @@
     </header>
 
     <nav class="chips" id="chips" aria-label="Categories in play"></nav>
+    <nav class="chips stack" id="stack" aria-label="What the build needs"></nav>
+    <p class="pool" id="pool" aria-live="polite"></p>
 
     <main class="table">
+      <button class="daily" id="daily">🗓️ Today's fortune <small id="dailyIn"></small></button>
       <div class="stage">
         <div class="pointer" id="pointer" aria-hidden="true"></div>
         <svg id="wheel" class="wheel" viewBox="-250 -250 500 500" aria-hidden="true"></svg>
@@ -44,7 +47,7 @@
     </main>
 
     <section class="history" id="historyWrap" hidden>
-      <h2>Your past fortunes</h2>
+      <h2>Your past fortunes<span id="jpCount"></span></h2>
       <ol id="history"></ol>
     </section>
 
@@ -54,8 +57,9 @@
     </footer>
 
     <div class="modal" id="modal" hidden>
-      <div class="modal-inner" role="dialog" aria-modal="true" aria-labelledby="slipTitle">
+      <div class="modal-inner" id="modalInner" role="dialog" aria-modal="true" aria-labelledby="slipTitle">
         <button class="close" id="close" aria-label="Close">✕</button>
+        <p class="jp-banner" id="jpBanner" hidden>👑 JACKPOT 👑</p>
         <div class="cookie" id="cookie" aria-hidden="true">
           <div class="half left"></div>
           <div class="half right"></div>
@@ -66,18 +70,49 @@
           <p class="slip-pitch" id="slipPitch"></p>
           <p class="slip-twist" id="slipTwist" hidden></p>
           <dl class="slip-meta" id="slipMeta"></dl>
+          <p class="slip-deadline" id="slipDeadline" hidden></p>
         </article>
         <div class="actions" id="actions">
           <button id="copy">📋 Copy build prompt</button>
           <button id="twist">🌶️ Add a twist</button>
           <button id="share">🔗 Share</button>
           <button id="card">🖼️ Save card</button>
+          <button id="challenge">⚔️ Challenge a friend</button>
           <button id="again" class="primary">🎰 Spin again</button>
         </div>
+        <form class="ch-form" id="chForm" hidden>
+          <label>Your name (optional)<input id="chName" maxlength="24" autocomplete="nickname" placeholder="Anonymous rival" /></label>
+          <label>Deadline
+            <select id="chHours">
+              <option value="24">24 hours</option>
+              <option value="48" selected>48 hours</option>
+              <option value="168">1 week</option>
+            </select>
+          </label>
+          <button type="submit">⚔️ Send the challenge</button>
+        </form>
         <details class="prompt">
           <summary>See the prompt</summary>
           <pre id="promptText"></pre>
         </details>
+      </div>
+    </div>
+
+    <div class="modal" id="envelope" hidden>
+      <div class="modal-inner env" role="dialog" aria-modal="true" aria-labelledby="envText">
+        <div id="envAsk">
+          <div class="envelope-art" aria-hidden="true"><span class="seal">⚔️</span></div>
+          <p class="env-text" id="envText"></p>
+          <div class="env-actions">
+            <button id="decline">Decline</button>
+            <button id="accept" class="primary">⚔️ Accept and open</button>
+          </div>
+        </div>
+        <div id="envChicken" hidden>
+          <div class="chicken" aria-hidden="true">🐔</div>
+          <p class="env-text">Bawk bawk. The challenge will wait for someone braver.</p>
+          <div class="env-actions"><button id="envBack" class="primary">🎰 Spin my own</button></div>
+        </div>
       </div>
     </div>
 
