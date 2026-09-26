@@ -49,4 +49,19 @@ export const THEMES: Theme[] = [
   },
 ];
 
-export const themeByKey = (key: unknown) => THEMES.find((t) => t.key === key) ?? THEMES[0];
+// WCAG relative luminance and contrast ratio of two #rrggbb colours.
+const luminance = (hex: string) => {
+  const [r, g, b] = [1, 3, 5].map((i) => {
+    const c = parseInt(hex.slice(i, i + 2), 16) / 255;
+    return c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+  });
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+};
+export const contrast = (a: string, b: string) => {
+  const [hi, lo] = [luminance(a), luminance(b)].sort((x, y) => y - x);
+  return (hi + 0.05) / (lo + 0.05);
+};
+// Text colour for anything written on a category colour: whichever of black/white reads better.
+export const inkOn = (bg: string) => (contrast(bg, "#000000") >= contrast(bg, "#ffffff") ? "#000000" : "#ffffff");
+
+export const themeByKey =(key: unknown) => THEMES.find((t) => t.key === key) ?? THEMES[0];

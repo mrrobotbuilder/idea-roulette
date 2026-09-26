@@ -1,5 +1,5 @@
 // Fortune card: a 1200x630 PNG painted with the Canvas 2D API.
-import type { Theme } from "./themes.ts";
+import { inkOn, type Theme } from "./themes.ts";
 
 export type CardData = {
   category: string;
@@ -162,7 +162,7 @@ export const renderCard = async (d: CardData): Promise<Blob> => {
   ctx.beginPath();
   ctx.roundRect(TEXT_X, TEXT_TOP, pillW, 38, 19);
   ctx.fill();
-  ctx.fillStyle = "#fff";
+  ctx.fillStyle = inkOn(d.color);
   ctx.fillText(label, TEXT_X + 16, TEXT_TOP + 27);
 
   // title, pitch, twist

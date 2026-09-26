@@ -1,7 +1,7 @@
 import "./style.css";
 import { CATEGORIES, TWISTS, parseIdea, type Pick } from "./ideas.ts";
 import { sliceAtPointer, targetRotation } from "./wheel.ts";
-import { THEMES, themeByKey } from "./themes.ts";
+import { THEMES, themeByKey, inkOn } from "./themes.ts";
 import { renderCard } from "./card.ts";
 
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => {
@@ -74,7 +74,7 @@ const drawWheel = () => {
     const off = enabled[s % N] ? "" : " off";
     svg += `<path class="slice${off}" d="M0 0 L${polar(a0, 228)} A228 228 0 0 1 ${polar(a1, 228)} Z" fill="${catColor(s % N)}"/>`;
     svg += `<g transform="rotate(${mid})" class="label${off}"><text y="-180" text-anchor="middle" font-size="30">${c.emoji}</text>`;
-    svg += `<text transform="translate(0 -122) rotate(-90)" text-anchor="middle" dominant-baseline="central" font-size="12" class="lname">${c.name.split(" ")[0].toUpperCase()}</text></g>`;
+    svg += `<text transform="translate(0 -122) rotate(-90)" text-anchor="middle" dominant-baseline="central" font-size="12" class="lname" style="fill:${inkOn(catColor(s % N))}">${c.name.split(" ")[0].toUpperCase()}</text></g>`;
   }
   for (let b = 0; b < 32; b++) {
     const [x, y] = polar(b * (360 / 32), 239).split(" ");
@@ -92,7 +92,7 @@ const chips = $("chips");
 const drawChips = () => {
   chips.innerHTML = CATEGORIES.map(
     (c, i) =>
-      `<button class="chip${enabled[i] ? " on" : ""}" data-i="${i}" aria-pressed="${enabled[i]}" style="--c:${catColor(i)}">${c.emoji} ${c.name}</button>`,
+      `<button class="chip${enabled[i] ? " on" : ""}" data-i="${i}" aria-pressed="${enabled[i]}" style="--c:${catColor(i)};--on:${inkOn(catColor(i))}">${c.emoji} ${c.name}</button>`,
   ).join("");
 };
 chips.addEventListener("click", (e) => {
@@ -228,7 +228,8 @@ const fillSlip = (p: Pick) => {
   const lucky = luckyFor(p);
   const stars = "★".repeat((seed % 3) + 1).padEnd(3, "☆");
   $("slipCat").textContent = `${c.emoji} ${c.name}`;
-  $("slipCat").style.color = catColor(p.cat);
+  $("slipCat").style.background = catColor(p.cat);
+  $("slipCat").style.color = inkOn(catColor(p.cat));
   $("slipTitle").textContent = title;
   $("slipPitch").textContent = pitch;
   const tw = $("slipTwist");

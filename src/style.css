@@ -151,7 +151,7 @@ h1 span { color: #fff; text-shadow: 0 3px 0 var(--red), 0 0 24px rgba(255, 80, 8
   padding: 6px 12px; border-radius: 999px; font-size: 0.9rem; opacity: 0.5;
   transition: opacity 0.15s, background 0.15s;
 }
-.chip.on { background: var(--c); opacity: 1; color: #fff; text-shadow: 0 1px 2px rgba(0,0,0,0.4); }
+.chip.on { background: var(--c); opacity: 1; color: var(--on); }
 .chip:focus-visible, button:focus-visible { outline: 3px solid var(--gold); outline-offset: 2px; }
 
 /* ---------- wheel ---------- */
@@ -171,7 +171,7 @@ h1 span { color: #fff; text-shadow: 0 3px 0 var(--red), 0 0 24px rgba(255, 80, 8
 .slice { stroke: rgba(0, 0, 0, 0.35); stroke-width: 1.5; }
 .slice.off { fill: #37433f; }
 .label.off { opacity: 0.3; }
-.lname { fill: #fff; font-family: var(--display); letter-spacing: 1px; paint-order: stroke; stroke: rgba(0, 0, 0, 0.55); stroke-width: 3px; }
+.lname { font-family: var(--display); letter-spacing: 1px; }
 .bulb { fill: var(--gold); }
 .hub-ring { fill: var(--hub-ring); stroke: var(--gold); stroke-width: 5; }
 
@@ -278,7 +278,7 @@ footer a { color: var(--gold); }
   transition: transform 0.6s 0.25s cubic-bezier(.2,1.2,.4,1), opacity 0.2s 0.25s;
 }
 .cracked + .slip { transform: none; opacity: 1; }
-.slip-cat { margin: 0; font-family: "Outfit", sans-serif; font-weight: 800; font-size: 0.85rem; text-transform: uppercase; letter-spacing: 1px; }
+.slip-cat { display: inline-block; padding: 3px 10px; border-radius: 999px; margin: 0; font-family: "Outfit", sans-serif; font-weight: 800; font-size: 0.85rem; text-transform: uppercase; letter-spacing: 1px; }
 .slip h2 { margin: 6px 0 8px; font-size: 1.7rem; line-height: 1.15; }
 .slip-pitch { margin: 0; font-size: 1.05rem; line-height: 1.45; }
 .slip-twist { margin: 10px 0 0; font-weight: bold; color: var(--red); }

@@ -2,6 +2,7 @@
 import assert from "node:assert/strict";
 import { CATEGORIES, TWISTS, parseIdea } from "../src/ideas.ts";
 import { sliceAtPointer, targetRotation } from "../src/wheel.ts";
+import { THEMES, contrast, inkOn } from "../src/themes.ts";
 
 const SLICES = CATEGORIES.length * 2;
 
@@ -36,4 +37,16 @@ for (const c of CATEGORIES) {
 }
 assert.ok(TWISTS.length >= 30 && TWISTS.every((t) => t.startsWith("...")), "twists");
 
-console.log(`OK: ${spins} spins landed correctly, ${ideas} unique ideas, ${TWISTS.length} twists`);
+// Themes: text written on any category colour (chips, slip pill, card pill, wheel) reaches 4.5:1.
+let pairs = 0;
+for (const t of THEMES) {
+  assert.equal(t.palette.length, CATEGORIES.length, `${t.name} needs one colour per category`);
+  for (const c of t.palette) {
+    const r = contrast(c, inkOn(c));
+    assert.ok(r >= 4.5, `${t.name} ${c}: text contrast ${r.toFixed(2)} < 4.5`);
+    pairs++;
+  }
+}
+assert.ok(contrast("#ffffff", "#000000") > 20.9 && Math.abs(contrast("#777777", "#ffffff") - 4.48) < 0.01, "contrast() matches WCAG");
+
+console.log(`${pairs} theme colours readable. OK: ${spins} spins landed correctly, ${ideas} unique ideas, ${TWISTS.length} twists`);
