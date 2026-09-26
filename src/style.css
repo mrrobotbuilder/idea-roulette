@@ -402,3 +402,14 @@ footer a { color: var(--gold); }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; }
 }
+
+/* ---------- votes ---------- */
+.actions .vote { font-weight: 800; font-variant-numeric: tabular-nums; }
+.actions .vote.on { border-color: var(--gold); color: var(--gold); background: rgba(0,0,0,0.35); }
+.actions .vote:disabled { opacity: 0.75; cursor: default; }
+.top summary { text-align: center; cursor: pointer; }
+.top summary h2 { display: inline; }
+.top ol { flex-direction: column; flex-wrap: nowrap; align-items: stretch; }
+.top button { width: 100%; display: flex; justify-content: space-between; gap: 12px; text-align: left; }
+.top button b { color: var(--gold); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.top-msg { text-align: center; color: var(--muted); }

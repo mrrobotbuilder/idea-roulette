@@ -647,3 +647,13 @@ export const pickFromId = (key: string, idx: number, twist: number | null): Pick
   const p = { cat: key === JACKPOT_CAT.key ? JACKPOT : CATEGORIES.findIndex((c) => c.key === key), idx, twist };
   return ideaOf(p) ? p : null;
 };
+
+// The pick for a real idea's id written the canonical way, else null, so "money-012" can
+// never become a second vote key for "money-12". The API validates every id with this.
+export const pickOfId = (id: unknown): Pick | null => {
+  if (typeof id !== "string" || id.length > 40) return null;
+  const m = /^([a-z]+)-(\d+)$/.exec(id);
+  const p = m && pickFromId(m[1], Number(m[2]), null);
+  return p && ideaId(p) === id ? p : null;
+};
+export const isIdeaId = (id: unknown): id is string => pickOfId(id) !== null;

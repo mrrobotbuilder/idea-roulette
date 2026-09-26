@@ -51,6 +51,12 @@
       <ol id="history"></ol>
     </section>
 
+    <details class="history top" id="topWrap">
+      <summary><h2>🔥 Most wanted</h2></summary>
+      <p class="top-msg" id="topMsg" aria-live="polite"></p>
+      <ol id="top"></ol>
+    </details>
+
     <footer>
       Free forever · Built for vibe coders who ran dry ·
       <a href="https://github.com/mrrobotbuilder/idea-roulette" target="_blank" rel="noopener">GitHub</a>
@@ -73,6 +79,7 @@
           <p class="slip-deadline" id="slipDeadline" hidden></p>
         </article>
         <div class="actions" id="actions">
+          <button id="vote" class="vote" aria-pressed="false">▲ …</button>
           <button id="copy">📋 Copy build prompt</button>
           <button id="twist">🌶️ Add a twist</button>
           <button id="share">🔗 Share</button>

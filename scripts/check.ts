@@ -1,6 +1,6 @@
 // Run: npm run check. Fails loudly if the wheel math, the idea bank, the daily pick or link parsing is broken.
 import assert from "node:assert/strict";
-import { CATEGORIES, JACKPOT, JACKPOTS, STACKS, TAGS, TWISTS, ideaOf, parseIdea } from "../src/ideas.ts";
+import { CATEGORIES, JACKPOT, JACKPOTS, STACKS, TAGS, TWISTS, ideaOf, isIdeaId, parseIdea } from "../src/ideas.ts";
 import { sliceAtPointer, targetRotation } from "../src/wheel.ts";
 import { THEMES, contrast, inkOn } from "../src/themes.ts";
 import { dailyPick, msToNextDay, utcDate } from "../src/daily.ts";
@@ -100,6 +100,12 @@ const bad = [
   "#challenge-nope-1-2-48", "#challenge-money-1-2-48-" + "A".repeat(200), "#money-1-2<script>",
 ];
 for (const h of bad) assert.equal(parseHash(h), null, `should reject ${h}`);
+
+// Vote ids: every real idea is valid, and near-misses can never become a second vote key.
+const allIds = [...CATEGORIES.flatMap((c) => c.ideas.map((_, i) => `${c.key}-${i}`)), ...JACKPOTS.map((_, i) => `jackpot-${i}`)];
+for (const id of allIds) assert.ok(isIdeaId(id), id);
+const badIds = ["", "money", "money-", "money-01", "money-1.0", "money--1", "Money-1", "nope-1", `money-${CATEGORIES[0].ideas.length}`, `jackpot-${JACKPOTS.length}`, "money-1 ", 7, null];
+for (const id of badIds) assert.equal(isIdeaId(id), false, `should reject ${String(id)}`);
 
 console.log(
   `OK: ${pairs} theme colours readable, ${spins} spins landed, ${ideas} ideas + ${JACKPOTS.length} jackpots, ${TWISTS.length} twists, ` +

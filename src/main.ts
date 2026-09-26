@@ -1,5 +1,5 @@
 import "./style.css";
-import { CATEGORIES, JACKPOT, JACKPOTS, STACKS, TWISTS, catOf, ideaOf, parseIdea, type Pick } from "./ideas.ts";
+import { CATEGORIES, JACKPOT, JACKPOTS, STACKS, TWISTS, catOf, ideaId, ideaOf, parseIdea, pickOfId, type Pick } from "./ideas.ts";
 import { sliceAtPointer, targetRotation } from "./wheel.ts";
 import { THEMES, themeByKey, inkOn } from "./themes.ts";
 import { renderCard } from "./card.ts";
@@ -299,6 +299,7 @@ const fillSlip = (p: Pick) => {
   $("promptText").textContent = buildPrompt(p);
   tickClock();
   window.history.replaceState(null, "", context.hash ?? hashFor(p));
+  loadVotes(ideaId(p));
 };
 
 // One clock drives both countdowns: the daily button and an accepted challenge's deadline.
@@ -544,6 +545,103 @@ const drawHistory = () => {
 $("history").addEventListener("click", (e) => {
   const btn = (e.target as HTMLElement).closest<HTMLButtonElement>("button");
   if (btn && !spinning) reveal(history[Number(btn.dataset.i)]);
+});
+
+// ---------- votes ----------
+// A random id per browser; the server keeps one vote per id per idea.
+const voterId = (() => {
+  const v = load("ir-voter", "");
+  if (typeof v === "string" && /^[A-Za-z0-9-]{8,64}$/.test(v)) return v;
+  const id = crypto.randomUUID();
+  save("ir-voter", id);
+  return id;
+})();
+const OFFLINE = "Votes are offline right now";
+type ApiError = Error & { status?: number };
+const api = async <T>(path: string, init?: RequestInit): Promise<T> => {
+  const r = await fetch(path, init);
+  const body = await r.json().catch(() => null);
+  if (!r.ok || !body) throw Object.assign(new Error(body?.error ?? `HTTP ${r.status}`), { status: r.status }) as ApiError;
+  return body as T;
+};
+const voteBtn = $<HTMLButtonElement>("vote");
+let voteFor = ""; // the idea the button shows; a late answer about another idea is dropped
+let voted = false;
+// count null means "unknown": never show 0 when the truth is that we could not ask.
+const drawVote = (count: number | null, mine: boolean, unknownText = OFFLINE) => {
+  voted = mine;
+  voteBtn.disabled = count === null;
+  voteBtn.classList.toggle("on", mine);
+  voteBtn.setAttribute("aria-pressed", String(mine));
+  voteBtn.textContent = count === null ? `▲ ${unknownText}` : `▲ ${count} · ${mine ? "you want it" : "want it built"}`;
+};
+const loadVotes = async (id: string) => {
+  voteFor = id;
+  drawVote(null, false, "…");
+  try {
+    const r = await api<{ counts: Record<string, number>; mine: string[] }>(`/api/votes?ids=${id}&voter=${voterId}`);
+    if (voteFor === id) drawVote(r.counts[id], r.mine.includes(id));
+  } catch (e) {
+    console.error("votes:", e);
+    if (voteFor === id) drawVote(null, false);
+  }
+};
+voteBtn.addEventListener("click", async () => {
+  if (!current) return;
+  const id = ideaId(current);
+  voteBtn.disabled = true;
+  try {
+    const r = await api<{ count: number; voted: boolean }>("/api/vote", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ ideaId: id, voterId, up: !voted }),
+    });
+    if (voteFor === id) drawVote(r.count, r.voted);
+    drawTop();
+  } catch (e) {
+    console.error("vote:", e);
+    if (voteFor !== id) return;
+    if ((e as ApiError).status === 429) {
+      voteBtn.disabled = false; // the shown count is still true, only this vote was refused
+      toast("Easy, high roller. Too many votes, try again in a few minutes.");
+    } else drawVote(null, false);
+  }
+});
+
+// ---------- most wanted ----------
+const topWrap = $<HTMLDetailsElement>("topWrap");
+const topMsg = $("topMsg");
+let topPicks: Pick[] = [];
+const drawTop = async () => {
+  if (!topWrap.open) return;
+  topMsg.hidden = false;
+  topMsg.textContent = "Counting the votes…";
+  try {
+    const { top } = await api<{ top: { id: string; votes: number }[] }>("/api/top");
+    const rows = top.flatMap((t) => {
+      const p = pickOfId(t.id);
+      return p ? [{ p, votes: t.votes }] : [];
+    });
+    topPicks = rows.map((r) => r.p);
+    topMsg.textContent = rows.length ? "" : "No votes yet. Spin, then ▲ the ideas you want to see built.";
+    topMsg.hidden = rows.length > 0;
+    $("top").innerHTML = rows
+      .map(({ p, votes }, i) => {
+        const { title, cat: c } = ideaOf(p)!;
+        return `<li><button data-i="${i}" style="--c:${catColor(p.cat)}"><span>${c.emoji} ${title}</span><b>▲ ${votes}</b></button></li>`;
+      })
+      .join("");
+  } catch (e) {
+    console.error("top:", e);
+    topPicks = [];
+    $("top").innerHTML = "";
+    topMsg.textContent = OFFLINE;
+  }
+};
+topWrap.addEventListener("toggle", drawTop);
+$("top").addEventListener("click", (e) => {
+  const btn = (e.target as HTMLElement).closest<HTMLButtonElement>("button");
+  if (btn && !spinning && envelope.hidden) reveal(topPicks[Number(btn.dataset.i)]);
 });
 
 // ---------- confetti ----------
