@@ -57,6 +57,12 @@
       <ol id="top"></ol>
     </details>
 
+    <details class="history top" id="recentWrap">
+      <summary><h2>🚀 Recent builds</h2></summary>
+      <p class="top-msg" id="recentMsg" aria-live="polite"></p>
+      <ul class="builds" id="recent"></ul>
+    </details>
+
     <footer>
       Free forever · Built for vibe coders who ran dry ·
       <a href="https://github.com/mrrobotbuilder/idea-roulette" target="_blank" rel="noopener">GitHub</a>
@@ -85,6 +91,7 @@
           <button id="share">🔗 Share</button>
           <button id="card">🖼️ Save card</button>
           <button id="challenge">⚔️ Challenge a friend</button>
+          <button id="built">🚀 I built it!</button>
           <button id="again" class="primary">🎰 Spin again</button>
         </div>
         <form class="ch-form" id="chForm" hidden>
@@ -98,6 +105,25 @@
           </label>
           <button type="submit">⚔️ Send the challenge</button>
         </form>
+        <form class="ch-form build-form" id="buildForm" novalidate hidden>
+          <label>Link to your build<input id="bUrl" type="url" inputmode="url" maxlength="300" autocomplete="url" placeholder="https://my-app.vercel.app" /></label>
+          <label>Title<input id="bTitle" maxlength="80" placeholder="What you called it" /></label>
+          <label>Nickname<input id="bNick" maxlength="20" autocomplete="nickname" autocapitalize="off" spellcheck="false" placeholder="3 to 20 letters" /></label>
+          <label id="bCodeWrap" hidden>Recovery code<input id="bCode" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Nickname.code" /></label>
+          <button type="button" class="link" id="bHaveCode">Have a recovery code?</button>
+          <button type="submit">🚀 Post it</button>
+          <p class="form-msg" id="bMsg" role="alert" hidden></p>
+        </form>
+        <div class="recovery" id="recovery" hidden>
+          <p><b>The nickname <span id="recNick"></span> is yours.</b> This is your recovery code. It is shown once: keep it somewhere safe to post as yourself from another device.</p>
+          <input id="recCode" readonly aria-label="Your recovery code" />
+          <div class="env-actions"><button id="recCopy">📋 Copy code</button><button id="recDone" class="primary">I saved it</button></div>
+        </div>
+        <section class="gallery" aria-labelledby="galHead">
+          <h3 id="galHead">🚀 Built from this idea</h3>
+          <p class="top-msg" id="galMsg" aria-live="polite"></p>
+          <ul class="builds" id="galList"></ul>
+        </section>
         <details class="prompt">
           <summary>See the prompt</summary>
           <pre id="promptText"></pre>

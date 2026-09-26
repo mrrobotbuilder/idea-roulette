@@ -300,6 +300,7 @@ const fillSlip = (p: Pick) => {
   tickClock();
   window.history.replaceState(null, "", context.hash ?? hashFor(p));
   loadVotes(ideaId(p));
+  loadGallery(ideaId(p));
 };
 
 // One clock drives both countdowns: the daily button and an accepted challenge's deadline.
@@ -327,6 +328,8 @@ const reveal = (p: Pick, ctxt: Context = {}) => {
   modalInner.classList.toggle("gold", jp);
   $("jpBanner").hidden = !jp;
   chForm.hidden = true;
+  buildForm.hidden = true;
+  recovery.hidden = true;
   modal.hidden = false;
   modal.classList.remove("open");
   cookie.classList.remove("cracked");
@@ -642,6 +645,227 @@ topWrap.addEventListener("toggle", drawTop);
 $("top").addEventListener("click", (e) => {
   const btn = (e.target as HTMLElement).closest<HTMLButtonElement>("button");
   if (btn && !spinning && envelope.hidden) reveal(topPicks[Number(btn.dataset.i)]);
+});
+
+// ---------- "I built it!" gallery ----------
+// User text only ever reaches the page through textContent / .value, never innerHTML.
+type Build = { id: string; ideaId: string; twist: number | null; url: string; title: string; nick: string };
+type Claim = { nick: string; secret: string };
+const NICK = /^[A-Za-z0-9_-]{3,20}$/;
+const SECRET = /^[A-Za-z0-9_-]{43}$/;
+// Every nickname this browser has claimed, by lower-case name. A new claim never replaces an old one.
+const claims: Record<string, Claim> = Object.fromEntries(
+  Object.entries(load<Record<string, Claim>>("ir-claims", {}) ?? {}).filter(
+    ([k, c]) => c && NICK.test(c.nick) && SECRET.test(c.secret) && k === c.nick.toLowerCase(),
+  ),
+);
+// A recovery code is "Nickname.secret"; the nickname cannot contain a dot.
+const parseCode = (s: string): Claim | null => {
+  const [nick, secret, extra] = s.trim().split(".");
+  return extra === undefined && NICK.test(nick ?? "") && SECRET.test(secret ?? "") ? { nick, secret } : null;
+};
+const GAL_OFFLINE = "The gallery is offline right now.";
+const errText = (e: unknown) => ((e as ApiError).status ? (e as Error).message : `${GAL_OFFLINE} Try again in a minute.`);
+
+const safeHref = (u: string) => {
+  try {
+    const x = new URL(u);
+    return x.protocol === "https:" ? x.href : null;
+  } catch {
+    return null;
+  }
+};
+const el = <K extends keyof HTMLElementTagNameMap>(tag: K, cls: string, text = "") => {
+  const n = document.createElement(tag);
+  n.className = cls;
+  n.textContent = text;
+  return n;
+};
+const buildItem = (b: Build, withIdea: boolean) => {
+  const href = safeHref(b.url);
+  if (!href) return null;
+  const li = el("li", "build");
+  const a = el("a", "build-title", b.title);
+  a.href = href;
+  a.target = "_blank";
+  a.rel = "noopener nofollow ugc";
+  const by = el("span", "build-by", `by ${b.nick}`);
+  const pick = withIdea ? pickOfId(b.ideaId) : null;
+  if (pick) {
+    by.append(" · for ");
+    const open = el("button", "link idea-link", ideaOf(pick)!.title);
+    open.dataset.idea = b.ideaId;
+    by.append(open);
+  }
+  if (b.twist !== null && TWISTS[b.twist]) by.append(` · 🌶️ ${TWISTS[b.twist]}`);
+  const rep = el("button", "report", "⚑");
+  rep.dataset.id = b.id;
+  rep.title = "Report this build";
+  rep.setAttribute("aria-label", `Report ${b.title}`);
+  li.append(a, by, rep);
+  return li;
+};
+const drawBuilds = (list: HTMLElement, builds: Build[], withIdea: boolean) =>
+  list.replaceChildren(...builds.flatMap((b) => buildItem(b, withIdea) ?? []));
+
+const galList = $("galList");
+const galMsg = $("galMsg");
+let galleryFor = ""; // like voteFor: an answer about an idea no longer shown is dropped
+const loadGallery = async (id: string) => {
+  galleryFor = id;
+  galList.replaceChildren();
+  galMsg.hidden = false;
+  galMsg.textContent = "Looking for builds…";
+  try {
+    const { builds } = await api<{ builds: Build[] }>(`/api/builds?idea=${id}`);
+    if (galleryFor !== id) return;
+    drawBuilds(galList, builds, false);
+    galMsg.textContent = builds.length ? "" : "Nobody has shipped this one yet. Be the first.";
+    galMsg.hidden = builds.length > 0;
+  } catch (e) {
+    console.error("gallery:", e);
+    if (galleryFor === id) galMsg.textContent = GAL_OFFLINE;
+  }
+};
+
+const recentWrap = $<HTMLDetailsElement>("recentWrap");
+const recentMsg = $("recentMsg");
+const drawRecent = async () => {
+  if (!recentWrap.open) return;
+  recentMsg.hidden = false;
+  recentMsg.textContent = "Collecting the latest builds…";
+  try {
+    const { builds } = await api<{ builds: Build[] }>("/api/builds");
+    drawBuilds($("recent"), builds, true);
+    recentMsg.textContent = builds.length ? "" : "No builds yet. Spin, build it, then hit 🚀 I built it!";
+    recentMsg.hidden = builds.length > 0;
+  } catch (e) {
+    console.error("recent:", e);
+    $("recent").replaceChildren();
+    recentMsg.textContent = GAL_OFFLINE;
+  }
+};
+recentWrap.addEventListener("toggle", drawRecent);
+
+const onBuildClick = async (e: Event) => {
+  const t = e.target as HTMLElement;
+  const idea = t.closest<HTMLButtonElement>(".idea-link")?.dataset.idea;
+  if (idea) {
+    const p = pickOfId(idea);
+    if (p && !spinning && envelope.hidden) reveal(p);
+    return;
+  }
+  const rep = t.closest<HTMLButtonElement>(".report");
+  if (!rep || rep.disabled) return;
+  rep.disabled = true;
+  try {
+    const r = await api<{ hidden: boolean }>("/api/report", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ buildId: rep.dataset.id, reporterId: voterId }),
+    });
+    if (r.hidden) rep.closest("li")?.remove();
+    else rep.textContent = "reported";
+    toast("Reported. Thanks for keeping the table clean.");
+  } catch (e) {
+    console.error("report:", e);
+    rep.disabled = false;
+    toast(errText(e));
+  }
+};
+galList.addEventListener("click", onBuildClick);
+$("recent").addEventListener("click", onBuildClick);
+
+const buildForm = $<HTMLFormElement>("buildForm");
+const bNick = $<HTMLInputElement>("bNick");
+const bCode = $<HTMLInputElement>("bCode");
+const bCodeWrap = $("bCodeWrap");
+const bMsg = $("bMsg");
+const recovery = $("recovery");
+const formMsg = (text: string) => {
+  bMsg.textContent = text;
+  bMsg.hidden = !text;
+};
+$("built").addEventListener("click", () => {
+  recovery.hidden = true;
+  buildForm.hidden = !buildForm.hidden;
+  if (buildForm.hidden) return;
+  formMsg("");
+  bNick.value ||= load("ir-nick", "");
+  $("bUrl").focus();
+});
+$("bHaveCode").addEventListener("click", () => {
+  bCodeWrap.hidden = !bCodeWrap.hidden;
+  if (!bCodeWrap.hidden) bCode.focus();
+});
+buildForm.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  if (!current) return;
+  formMsg("");
+  // A pasted recovery code names the nickname itself; it is kept only once the server accepts it.
+  let pasted: Claim | null = null;
+  if (!bCodeWrap.hidden && bCode.value.trim()) {
+    pasted = parseCode(bCode.value);
+    if (!pasted) return formMsg("That recovery code does not look right. It looks like Nickname.xxxxxxxx");
+    bNick.value = pasted.nick;
+  }
+  const nick = bNick.value.trim();
+  if (!NICK.test(nick)) return formMsg("Nicknames are 3 to 20 letters, digits, _ or -.");
+  const secret = pasted?.secret ?? claims[nick.toLowerCase()]?.secret;
+  const p = current;
+  const submit = buildForm.querySelector<HTMLButtonElement>('button[type="submit"]')!;
+  submit.disabled = true;
+  try {
+    const r = await api<{ build: Build; secret?: string }>("/api/builds", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        ideaId: ideaId(p),
+        twist: p.twist,
+        url: $<HTMLInputElement>("bUrl").value,
+        title: $<HTMLInputElement>("bTitle").value,
+        nick,
+        secret,
+      }),
+    });
+    const got = r.secret ?? pasted?.secret;
+    if (got) {
+      claims[nick.toLowerCase()] = { nick: r.build.nick, secret: got };
+      save("ir-claims", claims);
+    }
+    save("ir-nick", r.build.nick);
+    buildForm.reset();
+    bNick.value = r.build.nick;
+    bCodeWrap.hidden = true;
+    buildForm.hidden = true;
+    if (r.secret) {
+      $("recNick").textContent = r.build.nick;
+      $<HTMLInputElement>("recCode").value = `${r.build.nick}.${r.secret}`;
+      recovery.hidden = false;
+      $("recCopy").focus();
+    } else toast("🚀 Posted! It is in the gallery.");
+    if (ideaId(p) === galleryFor) loadGallery(galleryFor);
+    drawRecent();
+  } catch (e) {
+    console.error("build:", e);
+    formMsg(errText(e));
+  } finally {
+    submit.disabled = false;
+  }
+});
+$("recCopy").addEventListener("click", async () => {
+  const code = $<HTMLInputElement>("recCode");
+  try {
+    await navigator.clipboard.writeText(code.value);
+    toast("Recovery code copied. Paste it somewhere safe.");
+  } catch {
+    code.select();
+    toast("Clipboard is blocked here. The code is selected: copy it by hand.");
+  }
+});
+$("recDone").addEventListener("click", () => {
+  recovery.hidden = true;
+  $<HTMLInputElement>("recCode").value = "";
 });
 
 // ---------- confetti ----------

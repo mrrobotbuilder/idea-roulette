@@ -48,6 +48,8 @@ Needs the owner's prep (see HOW-TO-RUN, Stage 3).
 4. UI: "🚀 I built it!" on the slip opens a form. Gallery section on each fortune (builds for this idea) and a "Recent builds" wall. Links open with `rel="noopener nofollow ugc"`. Recovery code screen after first claim, with copy button and a "paste recovery code" option.
 5. Never render user text with `innerHTML`. `textContent` only.
 
+**As built (2026-09-26):** a build hides at 3 distinct reporter ids AND 3 distinct IPs (stored hashed in `reportips:<buildId>`), because reporter ids are forgeable. Unhiding a build marks it `approved=1`, so reports cannot hide it again. Unhide takes `{buildId}` or `{nick}`. Recovery code = `Nick.secret`. Extra key: `urls:<ideaId>` set for the duplicate check. The Redis client runs with `automaticDeserialization: false`, so `HGETALL` returns a flat array: read hashes through `toHash()` in `api/_lib.ts`. Check: `node --env-file=.env --use-system-ca scripts/verify-builds.ts http://localhost:5207 --local` (vercel dev needs a `.env` holding the KV vars plus a throwaway ADMIN_TOKEN, because a `.env` replaces its pulled vars).
+
 **Verify:** every validation rule rejected with a clear message (script with bad inputs against `vercel dev`); claim a nick, try to post as it from another profile without the secret → refused; recovery code on the other profile → allowed; 3 reports hide it; admin unhide works. Hostile input: a 1 MB title and a script tag are rejected, not rendered.
 
 ## Stage 5: leaderboard + streaks + launch check

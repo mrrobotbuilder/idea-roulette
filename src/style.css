@@ -215,7 +215,7 @@ kbd { background: rgba(255,255,255,0.12); border-radius: 4px; padding: 1px 6px; 
 .history { width: 100%; max-width: 640px; margin-top: 16px; }
 .history h2 { font-family: var(--display); font-weight: 400; font-size: 1rem; color: var(--gold); text-align: center; }
 .history ol { list-style: none; padding: 0; display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; }
-.history button {
+.history ol button {
   background: rgba(0,0,0,0.25); color: var(--text); border: 1px solid var(--c);
   border-radius: 10px; padding: 6px 10px; font-size: 0.9rem;
 }
@@ -410,6 +410,34 @@ footer a { color: var(--gold); }
 .top summary { text-align: center; cursor: pointer; }
 .top summary h2 { display: inline; }
 .top ol { flex-direction: column; flex-wrap: nowrap; align-items: stretch; }
-.top button { width: 100%; display: flex; justify-content: space-between; gap: 12px; text-align: left; }
-.top button b { color: var(--gold); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.top ol button { width: 100%; display: flex; justify-content: space-between; gap: 12px; text-align: left; }
+.top ol button b { color: var(--gold); white-space: nowrap; font-variant-numeric: tabular-nums; }
 .top-msg { text-align: center; color: var(--muted); }
+
+/* ---------- builds gallery ---------- */
+.build-form label[hidden] { display: none; }
+.build-form .link { align-self: center; background: none; padding: 0; font-weight: 400; color: var(--muted); }
+.form-msg { width: 100%; margin: 0; text-align: center; color: #fff; background: rgba(192, 57, 43, 0.55); border-radius: 8px; padding: 6px 10px; }
+.form-msg[hidden], .recovery[hidden] { display: none; }
+.recovery { width: 100%; margin-top: 12px; padding: 14px; background: rgba(0, 0, 0, 0.4); border: 1px solid var(--gold); border-radius: 12px; text-align: center; }
+.recovery p { margin: 0 0 10px; line-height: 1.4; }
+.recovery input { font: 0.95rem ui-monospace, monospace; width: 100%; padding: 8px; border-radius: 8px; border: 1px solid rgba(255, 255, 255, 0.3); background: rgba(0, 0, 0, 0.35); color: #fff; }
+.recovery .env-actions { margin-top: 12px; }
+.recovery #recCopy { border: 1px solid rgba(255, 255, 255, 0.3); background: rgba(255, 255, 255, 0.08); color: #fff; }
+.recovery .primary { border: 0; font-weight: 800; color: var(--on-gold); background: linear-gradient(#ffe68a, var(--gold)); }
+.gallery { width: 100%; margin-top: 14px; }
+.gallery h3 { margin: 0 0 4px; text-align: center; font-family: var(--display); font-weight: 400; font-size: 0.95rem; color: var(--gold); }
+.builds { list-style: none; padding: 0; margin: 6px 0 0; display: flex; flex-direction: column; gap: 6px; }
+.build {
+  display: grid; grid-template-columns: 1fr auto; gap: 2px 10px; align-items: center;
+  padding: 8px 10px; border-radius: 10px; background: rgba(0, 0, 0, 0.3); color: var(--text); text-align: left;
+}
+.build-title { color: var(--gold); font-weight: 800; overflow-wrap: anywhere; }
+.build-by { grid-column: 1; font-size: 0.8rem; color: var(--muted); overflow-wrap: anywhere; }
+.build-by .link { font-size: inherit; color: var(--text); }
+.build .report {
+  grid-column: 2; grid-row: 1 / span 2; background: none; color: var(--muted);
+  border: 1px solid rgba(255, 255, 255, 0.25); border-radius: 8px; padding: 4px 8px; font-size: 0.8rem;
+}
+.build .report:disabled { opacity: 0.6; cursor: default; }
+.history .builds { width: 100%; }

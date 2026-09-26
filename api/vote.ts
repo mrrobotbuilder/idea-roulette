@@ -11,7 +11,7 @@ return {redis.call("SISMEMBER", KEYS[1], ARGV[1]), n}
 
 export async function POST(req: Request) {
   const body = await readJson(req);
-  if (!body) return json({ error: "Send a JSON body." }, 400);
+  if (typeof body === "string") return json({ error: body }, 400);
   const { ideaId, voterId, up } = body;
   if (!validId(ideaId)) return json({ error: "Unknown idea." }, 400);
   if (!validVoter(voterId)) return json({ error: "Bad voter id." }, 400);
