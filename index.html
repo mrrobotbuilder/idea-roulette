@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Idea Roulette: spin for your next build</title>
+    <meta name="description" content="Out of ideas? Spin the wheel, crack the fortune cookie, and get your next app idea. 400 ideas, 40 twists, free forever. Built for vibe coders." />
+    <meta property="og:title" content="Idea Roulette" />
+    <meta property="og:description" content="Spin the wheel, crack the cookie, build the idea. 400 ideas for vibe coders." />
+    <meta name="theme-color" content="#0b3d2e" />
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🥠</text></svg>" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Bungee&family=Outfit:wght@400;600;800&family=Special+Elite&display=swap" rel="stylesheet" />
+  </head>
+  <body>
+    <div id="err" role="alert" hidden></div>
+
+    <header class="marquee">
+      <div class="bulbs" aria-hidden="true"></div>
+      <h1>Idea <span>Roulette</span></h1>
+      <p class="tag">Out of ideas? Let the house decide.</p>
+      <p class="stats" id="stats"></p>
+    </header>
+
+    <nav class="chips" id="chips" aria-label="Categories in play"></nav>
+
+    <main class="table">
+      <div class="stage">
+        <div class="pointer" id="pointer" aria-hidden="true"></div>
+        <svg id="wheel" class="wheel" viewBox="-250 -250 500 500" aria-hidden="true"></svg>
+        <button class="hub" id="hub" aria-label="Spin the wheel">SPIN</button>
+      </div>
+      <button class="spin-btn" id="spin">🎰 Spin the wheel</button>
+      <p class="hint">or press <kbd>Space</kbd> · <button class="link" id="mute"></button></p>
+    </main>
+
+    <section class="history" id="historyWrap" hidden>
+      <h2>Your past fortunes</h2>
+      <ol id="history"></ol>
+    </section>
+
+    <footer>
+      Free forever · Built for vibe coders who ran dry ·
+      <a href="https://github.com/mrrobotbuilder/idea-roulette" target="_blank" rel="noopener">GitHub</a>
+    </footer>
+
+    <div class="modal" id="modal" hidden>
+      <div class="modal-inner" role="dialog" aria-modal="true" aria-labelledby="slipTitle">
+        <button class="close" id="close" aria-label="Close">✕</button>
+        <div class="cookie" id="cookie" aria-hidden="true">
+          <div class="half left"></div>
+          <div class="half right"></div>
+        </div>
+        <article class="slip" id="slip">
+          <p class="slip-cat" id="slipCat"></p>
+          <h2 id="slipTitle"></h2>
+          <p class="slip-pitch" id="slipPitch"></p>
+          <p class="slip-twist" id="slipTwist" hidden></p>
+          <dl class="slip-meta" id="slipMeta"></dl>
+        </article>
+        <div class="actions" id="actions">
+          <button id="copy">📋 Copy build prompt</button>
+          <button id="twist">🌶️ Add a twist</button>
+          <button id="share">🔗 Share</button>
+          <button id="again" class="primary">🎰 Spin again</button>
+        </div>
+        <details class="prompt">
+          <summary>See the prompt</summary>
+          <pre id="promptText"></pre>
+        </details>
+      </div>
+    </div>
+
+    <div class="toast" id="toast" role="status" aria-live="polite"></div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
