@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" data-theme="monte">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -11,7 +11,14 @@
     <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🥠</text></svg>" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Bungee&family=Outfit:wght@400;600;800&family=Special+Elite&display=swap" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=Bungee&family=Cinzel:wght@700&family=Monoton&family=Outfit:wght@400;600;800&family=Press+Start+2P&family=Special+Elite&display=swap" rel="stylesheet" />
+    <script>
+      // Apply the saved theme before first paint so returning visitors never flash green.
+      try {
+        var t = JSON.parse(localStorage.getItem("ir-theme"));
+        if (/^(monte|neon|lunar|arcade)$/.test(t)) document.documentElement.dataset.theme = t;
+      } catch (e) {}
+    </script>
   </head>
   <body>
     <div id="err" role="alert" hidden></div>
@@ -21,6 +28,7 @@
       <h1>Idea <span>Roulette</span></h1>
       <p class="tag">Out of ideas? Let the house decide.</p>
       <p class="stats" id="stats"></p>
+      <label class="theme-pick">🎨 Table <select id="theme"></select></label>
     </header>
 
     <nav class="chips" id="chips" aria-label="Categories in play"></nav>
@@ -63,6 +71,7 @@
           <button id="copy">📋 Copy build prompt</button>
           <button id="twist">🌶️ Add a twist</button>
           <button id="share">🔗 Share</button>
+          <button id="card">🖼️ Save card</button>
           <button id="again" class="primary">🎰 Spin again</button>
         </div>
         <details class="prompt">

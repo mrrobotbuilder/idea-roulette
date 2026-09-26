@@ -1,6 +1,8 @@
 import "./style.css";
 import { CATEGORIES, TWISTS, parseIdea, type Pick } from "./ideas.ts";
 import { sliceAtPointer, targetRotation } from "./wheel.ts";
+import { THEMES, themeByKey } from "./themes.ts";
+import { renderCard } from "./card.ts";
 
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => {
   const el = document.getElementById(id);
@@ -45,6 +47,8 @@ let history: Pick[] = load("ir-history", []);
 let rotation = 0;
 let spinning = false;
 let current: Pick | null = null;
+let theme = themeByKey(load("ir-theme", "monte"));
+const catColor = (i: number) => theme.palette[i];
 
 // ---------- header stats ----------
 const totalIdeas = CATEGORIES.reduce((n, c) => n + c.ideas.length, 0);
@@ -68,7 +72,7 @@ const drawWheel = () => {
     const a1 = a0 + seg;
     const mid = a0 + seg / 2;
     const off = enabled[s % N] ? "" : " off";
-    svg += `<path class="slice${off}" d="M0 0 L${polar(a0, 228)} A228 228 0 0 1 ${polar(a1, 228)} Z" fill="${c.color}"/>`;
+    svg += `<path class="slice${off}" d="M0 0 L${polar(a0, 228)} A228 228 0 0 1 ${polar(a1, 228)} Z" fill="${catColor(s % N)}"/>`;
     svg += `<g transform="rotate(${mid})" class="label${off}"><text y="-180" text-anchor="middle" font-size="30">${c.emoji}</text>`;
     svg += `<text transform="translate(0 -122) rotate(-90)" text-anchor="middle" dominant-baseline="central" font-size="12" class="lname">${c.name.split(" ")[0].toUpperCase()}</text></g>`;
   }
@@ -88,7 +92,7 @@ const chips = $("chips");
 const drawChips = () => {
   chips.innerHTML = CATEGORIES.map(
     (c, i) =>
-      `<button class="chip${enabled[i] ? " on" : ""}" data-i="${i}" aria-pressed="${enabled[i]}" style="--c:${c.color}">${c.emoji} ${c.name}</button>`,
+      `<button class="chip${enabled[i] ? " on" : ""}" data-i="${i}" aria-pressed="${enabled[i]}" style="--c:${catColor(i)}">${c.emoji} ${c.name}</button>`,
   ).join("");
 };
 chips.addEventListener("click", (e) => {
@@ -192,6 +196,10 @@ document.addEventListener("keydown", (e) => {
 
 // ---------- fortune ----------
 const seedFrom = (p: Pick) => p.cat * 997 + p.idx * 31 + 7;
+const luckyFor = (p: Pick) => {
+  const seed = seedFrom(p);
+  return [seed % 9 + 1, (seed * 7) % 42 + 3, (seed * 13) % 77 + 10].join(" · ");
+};
 const TIMES = ["one evening", "a weekend", "one caffeinated night", "a week of evenings", "a lunch break (if you are brave)"];
 const buildPrompt = (p: Pick) => {
   const c = CATEGORIES[p.cat];
@@ -217,10 +225,10 @@ const fillSlip = (p: Pick) => {
   const c = CATEGORIES[p.cat];
   const { title, pitch } = parseIdea(c.ideas[p.idx]);
   const seed = seedFrom(p);
-  const lucky = [seed % 9 + 1, (seed * 7) % 42 + 3, (seed * 13) % 77 + 10].join(" · ");
+  const lucky = luckyFor(p);
   const stars = "★".repeat((seed % 3) + 1).padEnd(3, "☆");
   $("slipCat").textContent = `${c.emoji} ${c.name}`;
-  $("slipCat").style.color = c.color;
+  $("slipCat").style.color = catColor(p.cat);
   $("slipTitle").textContent = title;
   $("slipPitch").textContent = pitch;
   const tw = $("slipTwist");
@@ -305,6 +313,62 @@ $("share").addEventListener("click", async () => {
   await copy(url, "Link copied. Send it to a friend who needs an idea.");
 });
 
+// ---------- fortune card ----------
+$("card").addEventListener("click", async () => {
+  if (!current) return;
+  const p = current;
+  const c = CATEGORIES[p.cat];
+  const { title, pitch } = parseIdea(c.ideas[p.idx]);
+  const blob = await renderCard({
+    category: c.name,
+    emoji: c.emoji,
+    color: catColor(p.cat),
+    title,
+    pitch,
+    twist: p.twist === null ? null : TWISTS[p.twist],
+    lucky: luckyFor(p),
+    site: location.host,
+    theme,
+    jackpot: false, // Stage 1 (jackpot mode) passes true for jackpot fortunes
+  });
+  const name = `idea-roulette-${title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "")}.png`;
+  const file = new File([blob], name, { type: "image/png" });
+  // Phones get the share sheet (save to photos, send in a chat); desktops just download.
+  if (matchMedia("(pointer: coarse)").matches && navigator.canShare?.({ files: [file] })) {
+    try {
+      await navigator.share({ files: [file], title: "Idea Roulette" });
+      return;
+    } catch (e) {
+      if ((e as DOMException).name === "AbortError") return;
+      throw e;
+    }
+  }
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = name;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 10_000);
+  toast("Card saved. Post it and tag a friend.");
+});
+
+// ---------- themes ----------
+const themePick = $<HTMLSelectElement>("theme");
+themePick.innerHTML = THEMES.map((t) => `<option value="${t.key}">${t.name}</option>`).join("");
+const applyTheme = () => {
+  document.documentElement.dataset.theme = theme.key;
+  document.querySelector('meta[name="theme-color"]')!.setAttribute("content", theme.meta);
+  themePick.value = theme.key;
+};
+themePick.addEventListener("change", () => {
+  theme = themeByKey(themePick.value);
+  save("ir-theme", theme.key);
+  applyTheme();
+  drawWheel();
+  drawChips();
+  drawHistory();
+  if (current && !modal.hidden) fillSlip(current);
+});
+
 // ---------- history ----------
 const remember = (p: Pick, replaceLast = false) => {
   const rest = replaceLast ? history.slice(1) : history;
@@ -318,7 +382,7 @@ const drawHistory = () => {
   $("history").innerHTML = history
     .map((h, i) => {
       const c = CATEGORIES[h.cat];
-      return `<li><button data-i="${i}" style="--c:${c.color}">${c.emoji} ${parseIdea(c.ideas[h.idx]).title}${h.twist === null ? "" : " 🌶️"}</button></li>`;
+      return `<li><button data-i="${i}" style="--c:${catColor(h.cat)}">${c.emoji} ${parseIdea(c.ideas[h.idx]).title}${h.twist === null ? "" : " 🌶️"}</button></li>`;
     })
     .join("");
 };
@@ -343,6 +407,7 @@ const confetti = () => {
 };
 
 // ---------- boot ----------
+applyTheme();
 drawWheel();
 drawChips();
 drawMute();
