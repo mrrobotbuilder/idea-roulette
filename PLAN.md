@@ -33,7 +33,7 @@ No backend. Ships four features.
 
 Needs the owner's prep (see HOW-TO-RUN, Stage 3).
 
-1. Provision Upstash Redis through the Marketplace on project `idea-roulette` (team Oriad), confirm `UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN` exist for **Production and Preview** (`filter_project_envs`), `vercel env pull`.
+1. Provision Upstash Redis through the Marketplace on project `idea-roulette` (team Oriad), confirm `UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN` (shipped as `KV_REST_API_URL` / `KV_REST_API_TOKEN`) exist for **Production and Preview** (`filter_project_envs`), `vercel env pull`.
 2. `api/` functions with `@upstash/redis` + `@upstash/ratelimit`. One shared `api/_lib.ts`: Redis client, JSON response helper, input validation, rate limiter, idea-id validation against the real idea bank (import `src/ideas.ts` so ids cannot drift).
 3. **Upvotes.** Each browser has a random voter id (localStorage). `POST /api/vote {ideaId, voterId}` toggles. Keys: `votes:<ideaId>` set of voter ids, `rank` zset ideaId → count. `GET /api/votes?ids=...` returns counts and whether you voted. Rate limit 60 votes / 10 min per IP. Slip shows ▲ count. A "🔥 Most wanted" tab lists the top 20 ideas.
 4. Errors are explicit: the UI says "Votes are offline right now" when the API fails. Never shows 0 votes when it actually means "unknown".
